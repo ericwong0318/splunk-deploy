@@ -1,0 +1,76 @@
+---
+# Splunk Enterprise standalone (ansible-role-for-splunk).
+# SECRET BEST PRACTICE: Move plain-text passwords into an encrypted 'my_splunk_secrets.yml' file via Ansible Vault.
+deployment_task: "check_splunk.yml" # FIXED: Replaces install_splunk.yml to enforce idempotency checks
+# deployment_task: "install_splunk.yml"
+splunk_install_type: "full"
+splunk_install_path: "/opt" # Explicitly enforces /opt as the parent destination directory
+
+# ==============================================================================
+# IDEMPOTENCY & INFRASTRUCTURE DEFINITIONS
+# ==============================================================================
+# Explicitly forces idempotency check against '/opt/splunk/bin/splunk version'
+
+splunk_package_version: "10.4.0"
+build_id: "f798d4d49089"
+splunk_package_arch: "linux-amd64.tgz" # Dynamic architecture target wrapper f798d4d49089-linux-amd64
+
+# Prevents pushing multi-gigabyte payload over SSH. Target nodes download directly.
+splunk_download_local: false
+
+# FIXED ARCHITECTURE ROUTING: Feeds version and build variables directly to target node installers
+splunk_package_url_full: "https://download.splunk.com/products/splunk/releases/{{ splunk_package_version }}/linux/splunk-{{ splunk_package_version }}-{{ build_id }}-{{ splunk_package_arch }}"
+
+# Enforces modern systemd configuration generation over legacy init.d scripts
+splunk_use_initd: false
+
+# Global OS-level user declarations matching the core app footprint
+splunk_nix_user: "splunk"
+splunk_nix_group: "splunk"
+
+# ==============================================================================
+# SECURITY, AUTHENTICATION & SEEDING (BEST OF BOTH)
+# ==============================================================================
+# Mandates user seeding files creation on initial deployment boot
+splunk_user_seed: true
+
+# Top-level parameters pointing to the auth payload for early health tasks
+splunk_admin_username: "admin"
+splunk_admin_password: "{{ splunk_admin_password }}"
+splunk_auth_user: "admin"
+splunk_auth_password: "{{ splunk_auth_password }}"
+
+# Security Hardening: Denies creation of polkit local elevation bypass rules
+splunk_create_polkit: 0
+
+# Security Toggle: Strict validation for package pulls (True prevents MITM attacks)
+splunk_validate_certs: true
+
+# ==============================================================================
+# DEEP ROLE TARGET CONFIGURATION (THE STRUCTURAL DICTIONARY)
+# ==============================================================================
+splunk:
+  opt: "/opt"
+  home: "/opt/splunk"
+  user: "splunk" # MANDATORY: Explicitly bypasses the 'auto_determined' Linux user error
+  group: "splunk" # MANDATORY: Pairs with the engine account permissions
+  role: "splunk_standalone"
+  admin_user: "admin"
+  password: "{{ splunk_admin_password }}"
+  declarative_admin_password: true
+  accept_license: true
+  web:
+    settings:
+      enableSplunkWebCSRF: "false"
+      remote_frontend_header: "X-Forwarded-For"
+      pattern_policy: "mix"
+
+# ==============================================================================
+# TASK FAILURE & API TIMEOUT CONTROLS
+# ==============================================================================
+# BYPASS FIX: Signals internal Python validation scripts to skip self-signed TLS check loops
+splunk_svc_verify: false
+
+# Optimized Timeout Limits: Cuts loop hang-time from 6 minutes down to 100 seconds
+retry_num: 20
+retry_delay: 5

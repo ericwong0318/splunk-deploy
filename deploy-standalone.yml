@@ -1,0 +1,28 @@
+---
+- name: Deploy Standalone Splunk Enterprise
+  hosts: ericw-splunk-ansible-testing
+  become: yes
+  environment:
+    SPLUNK_HOME: "/opt/splunk"
+    ANS_BYPASS_PROMPT: "true"
+  
+  vars_files:
+    - my_splunk_config.yml
+    - my_splunk_secrets.yml
+
+  # FORCE OVERRIDE HERE: This blocks the role from failing line 130
+  vars:
+    splunk_use_systemd: true
+    splunk_use_initd: false
+    current_start_method: "systemd"
+    boot_start_misconfigured: false
+
+  pre_tasks:
+    - name: Remove stale systemd file
+      file:
+        path: /etc/systemd/system/Splunkd.service
+        state: absent
+      ignore_errors: yes
+
+  roles:
+    - role: "./ansible-role-for-splunk/roles/splunk"
