@@ -1,0 +1,29 @@
+
+# ==============================================================================
+# SPLUNK ANSIBLE DEPLOYMENT SECURITY GUARD
+# ==============================================================================
+
+# 1. Critical Credentials & Secrets (NEVER COMMIT)
+my_splunk_secrets.yml
+*.j2.val
+*.vault
+.vault_pass
+
+# 2. Local Environment Overrides & Backups
+*.retry
+*.bak
+*.tmphiy
+
+# 4. Control Node System Trash (macOS / Linux)
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+
+# 5. Ansible Execution Logs & Cache
+.ansible/
+ansible.log
+
+# 6. Ignore external roles
+ansible-role-for-splunk
