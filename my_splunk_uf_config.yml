@@ -1,0 +1,61 @@
+---
+# Splunk Universal Forwarder (ansible-role-for-splunk).
+# SECRET BEST PRACTICE: keep passwords/keys in encrypted my_splunk_secrets.yml via Ansible Vault.
+
+deployment_task: "check_splunk.yml"
+splunk_install_type: "uf"
+splunk_install_path: "/opt"
+
+# ==============================================================================
+# PACKAGE SOURCE
+# ==============================================================================
+splunk_package_version: "10.4.0"
+build_id: "f798d4d49089"
+splunk_package_arch: "linux-amd64.tgz"
+
+# Target nodes download directly instead of pushing the package over SSH.
+splunk_download_local: false
+
+splunk_package_url_uf: "https://download.splunk.com/products/universalforwarder/releases/{{ splunk_package_version }}/linux/splunkforwarder-{{ splunk_package_version }}-{{ build_id }}-{{ splunk_package_arch }}"
+splunk_validate_certs: true
+
+# ==============================================================================
+# OS AND SERVICE SETTINGS
+# ==============================================================================
+splunk_nix_user: "splunk"
+splunk_nix_group: "splunk"
+splunk_use_initd: false
+splunk_create_polkit: 0
+systemd_unit_uf: "SplunkForwarder"
+
+# ==============================================================================
+# FORWARDER CONFIGURATION
+# ==============================================================================
+# Dynamic lookup: Grabs the ansible_host variable from the search group host mapping
+splunk_uri_ds: "{{ hostvars['ericw-splunk-ansible-testing']['ansible_host'] }}:8089"
+
+# Override per host in inventory/host_vars when deploying multiple forwarders.
+clientName: "{{ inventory_hostname }}"
+phoneHomeIntervalInSecs: 60
+
+# Optional deployment server shared secret. Define splunk_ds_key in
+# my_splunk_secrets.yml when your deployment server requires pass4SymmKey.
+# splunk_ds_key: "{{ splunk_ds_key }}"
+
+# ==============================================================================
+# DEEP ROLE TARGET CONFIGURATION
+# ==============================================================================
+splunk:
+  opt: "/opt"
+  home: "/opt/splunkforwarder"
+  user: "splunk"
+  group: "splunk"
+  role: "splunk_universal_forwarder"
+  accept_license: true
+
+# ==============================================================================
+# TASK FAILURE & API TIMEOUT CONTROLS
+# ==============================================================================
+splunk_svc_verify: false
+retry_num: 20
+retry_delay: 5

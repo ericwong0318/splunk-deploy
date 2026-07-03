@@ -5,7 +5,7 @@
   environment:
     SPLUNK_HOME: "/opt/splunk"
     ANS_BYPASS_PROMPT: "true"
-  
+
   vars_files:
     - my_splunk_config.yml
     - my_splunk_secrets.yml
@@ -26,3 +26,48 @@
 
   roles:
     - role: "./ansible-role-for-splunk/roles/splunk"
+
+  # START SPLUNK ENTERPRISE AFTER INSTALLATION
+  # post_tasks:
+  #   - name: Ensure Splunk Enterprise is started and running
+  #     systemd:
+  #       name: splunk
+  #       state: started
+  #       enabled: yes
+
+- name: Deploy Splunk Universal Forwarder
+  hosts: uf
+  become: yes
+
+  # FORCE OVERRIDE FOR FORWARDERS HERE:
+  vars:
+    splunk_use_systemd: true
+    splunk_use_initd: false
+    current_start_method: "systemd"
+    boot_start_misconfigured: false
+
+  pre_tasks:
+    - name: Remove stale Splunk Forwarder systemd file if it exists
+      file:
+        path: /etc/systemd/system/SplunkForwarder.service
+        state: absent
+      ignore_errors: yes
+
+  environment:
+    SPLUNK_HOME: "/opt/splunkforwarder"
+    ANS_BYPASS_PROMPT: "true"
+
+  vars_files:
+    - my_splunk_uf_config.yml
+    - my_splunk_secrets.yml
+
+  roles:
+    - role: "./ansible-role-for-splunk/roles/splunk"
+
+  # START UNIVERSAL FORWARDER AFTER INSTALLATION
+  # post_tasks:
+  #   - name: Ensure Splunk Universal Forwarder is started and running
+  #     systemd:
+  #       name: SplunkForwarder
+  #       state: started
+  #       enabled: yes
