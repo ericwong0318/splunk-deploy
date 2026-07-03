@@ -50,7 +50,7 @@ ericw-uf3                    : ok=59   changed=15   unreachable=0    failed=0   
 
 ## Post-Installation Health Check
 
-### Splunk Monitor Console
+### Splunk Monitoring Console
 
 Verify primary indexing status, operational volume metrics, and overall infrastructure health metrics directly within the Splunk Web environment:
 
