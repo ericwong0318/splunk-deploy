@@ -1,39 +1,63 @@
 # Splunk Deploy
 
-Use Ansible to deploy Splunk Enterprise and Universal Forwarder on Linux
+Automate the deployment of Splunk Enterprise and Universal Forwarders on Linux infrastructure using Ansible.
 
-# Requirement
+## Requirements
 
-Install the upstream vendor collection requirements locally before running the playbooks:
+Install the upstream vendor collection dependencies locally before executing the playbooks:
 
 ```bash
 ansible-galaxy install -r requirements.yml -p ./
+
 ```
 
-# Standalone Splunk Enterprise
+---
+
+## Deployment Workflows
+
+### 1. Standalone Enterprise & Universal Forwarder Deployment
+
+This workflow provisions Splunk Enterprise and deploys Universal Forwarder:
 
 ```bash
-ansible-playbook deploy-standalone.yml -i inventory.ini
+ansible-playbook -i inventory.yml deploy-standalone.yml
+
 ```
 
-# Universal Forwarder
+### 2. Distributed Infrastructure Tier Deployment
 
-# Distributed Splunk Enterprise
+For scaled environments requiring dedicated tiering (such as Heavy Forwarders, Indexers, or Search Heads):
 
 ```bash
-ansible-playbook deploy-distributed.yml -i inventory-distributed.ini
+ansible-playbook -i inventory-distributed.ini deploy-distributed.yml
+
 ```
 
-# Result
+---
 
-```bash
-PLAY RECAP *********************************************************************************************************************************************************************************************************************
+## Verification & Execution Results
+
+A successful end-to-end run will execute without failures or unreachable endpoints:
+
+```text
+PLAY RECAP ******************************************************************************************************
 ericw-splunk-ansible-testing : ok=28   changed=0    unreachable=0    failed=0    skipped=22   rescued=0    ignored=0
-ericw-uf3                  : ok=59   changed=15   unreachable=0    failed=0    skipped=55   rescued=0    ignored=0
+ericw-uf3                    : ok=59   changed=15   unreachable=0    failed=0    skipped=55   rescued=0    ignored=0
+
 ```
 
-# Health Check
+---
+
+## Post-Installation Health Check
+
+### Splunk Monitor Console
+
+Verify primary indexing status, operational volume metrics, and overall infrastructure health metrics directly within the Splunk Web environment:
 
 ![health_check](img/health_check.png)
+
+### Agent Management/ Forwarder Management Console
+
+Confirm that Universal Forwarder (e.g., `ericw-uf3`) have successfully phoned home to the central Splunk Enterprise instance:
 
 ![agent_management](img/agent_management.png)
