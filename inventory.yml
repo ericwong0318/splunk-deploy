@@ -1,0 +1,17 @@
+---
+all:
+  children:
+    uf:
+      hosts:
+        ericw-uf3:
+          ansible_host: 192.168.200.178
+          ansible_user: ericw
+    full:
+      children:
+        hf:
+          hosts: {}
+        search:
+          hosts:
+            ericw-splunk-ansible-testing:
+              ansible_host: 192.168.200.176
+              ansible_user: ericw
