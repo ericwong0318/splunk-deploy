@@ -1,0 +1,246 @@
+---
+- name: Install Distributed Splunk Enterprise Nodes
+  hosts:
+    - clustermanager
+    - indexer
+    - search
+    - deploymentserver
+    - dmc
+  become: yes
+  environment:
+    SPLUNK_HOME: "/opt/splunk"
+    ANS_BYPASS_PROMPT: "true"
+  vars_files:
+    - my_splunk_distributed_config.yml
+    - my_splunk_secrets.yml
+  vars:
+    splunk_use_systemd: true
+    splunk_use_initd: false
+    current_start_method: "systemd"
+    boot_start_misconfigured: false
+    deployment_task: "check_splunk.yml"
+  pre_tasks:
+    - name: Remove stale systemd file
+      ansible.builtin.file:
+        path: /etc/systemd/system/Splunkd.service
+        state: absent
+      ignore_errors: yes
+  roles:
+    - role: "./ansible-role-for-splunk/roles/splunk"
+
+- name: Configure Cluster Manager
+  hosts: clustermanager
+  become: yes
+  environment:
+    SPLUNK_HOME: "/opt/splunk"
+    ANS_BYPASS_PROMPT: "true"
+  vars_files:
+    - my_splunk_distributed_config.yml
+    - my_splunk_secrets.yml
+  vars:
+    splunk_use_systemd: true
+    splunk_use_initd: false
+    current_start_method: "systemd"
+    boot_start_misconfigured: false
+    deployment_task: "configure_idxc_manager.yml"
+  pre_tasks:
+    - name: Remove stale systemd file
+      ansible.builtin.file:
+        path: /etc/systemd/system/Splunkd.service
+        state: absent
+      ignore_errors: yes
+  roles:
+    - role: "./ansible-role-for-splunk/roles/splunk"
+  post_tasks:
+    - name: Create indexer receiving app directory
+      ansible.builtin.file:
+        path: "/opt/splunk/etc/master-apps/idxc_inputs/local"
+        state: directory
+        owner: "{{ splunk_nix_user }}"
+        group: "{{ splunk_nix_group }}"
+        mode: "0755"
+
+    - name: Configure clustered indexers to receive forwarded data
+      ansible.builtin.copy:
+        dest: "/opt/splunk/etc/master-apps/idxc_inputs/local/inputs.conf"
+        owner: "{{ splunk_nix_user }}"
+        group: "{{ splunk_nix_group }}"
+        mode: "0644"
+        content: |
+          [splunktcp://{{ splunktcpin_port.number }}]
+          disabled = 0
+      notify: apply indexer cluster bundle
+
+- name: Connect Indexers To Cluster Manager
+  hosts: indexer
+  become: yes
+  environment:
+    SPLUNK_HOME: "/opt/splunk"
+    ANS_BYPASS_PROMPT: "true"
+  vars_files:
+    - my_splunk_distributed_config.yml
+    - my_splunk_secrets.yml
+  vars:
+    splunk_use_systemd: true
+    splunk_use_initd: false
+    current_start_method: "systemd"
+    boot_start_misconfigured: false
+    deployment_task: "configure_idxc_member.yml"
+  pre_tasks:
+    - name: Remove stale systemd file
+      ansible.builtin.file:
+        path: /etc/systemd/system/Splunkd.service
+        state: absent
+      ignore_errors: yes
+  roles:
+    - role: "./ansible-role-for-splunk/roles/splunk"
+
+- name: Connect Search Heads To Indexer Cluster
+  hosts: search
+  become: yes
+  environment:
+    SPLUNK_HOME: "/opt/splunk"
+    ANS_BYPASS_PROMPT: "true"
+  vars_files:
+    - my_splunk_distributed_config.yml
+    - my_splunk_secrets.yml
+  vars:
+    splunk_use_systemd: true
+    splunk_use_initd: false
+    current_start_method: "systemd"
+    boot_start_misconfigured: false
+    deployment_task: "configure_idxc_sh.yml"
+  pre_tasks:
+    - name: Remove stale systemd file
+      ansible.builtin.file:
+        path: /etc/systemd/system/Splunkd.service
+        state: absent
+      ignore_errors: yes
+  roles:
+    - role: "./ansible-role-for-splunk/roles/splunk"
+
+- name: Configure Deployment Server Serverclasses
+  hosts: deploymentserver
+  become: yes
+  environment:
+    SPLUNK_HOME: "/opt/splunk"
+    ANS_BYPASS_PROMPT: "true"
+  vars_files:
+    - my_splunk_distributed_config.yml
+    - my_splunk_secrets.yml
+  vars:
+    splunk_use_systemd: true
+    splunk_use_initd: false
+    current_start_method: "systemd"
+    boot_start_misconfigured: false
+    deployment_task: "configure_serverclass.yml"
+  pre_tasks:
+    - name: Remove stale systemd file
+      ansible.builtin.file:
+        path: /etc/systemd/system/Splunkd.service
+        state: absent
+      ignore_errors: yes
+  roles:
+    - role: "./ansible-role-for-splunk/roles/splunk"
+  post_tasks:
+    - name: Create forwarder outputs deployment app directory
+      ansible.builtin.file:
+        path: "/opt/splunk/etc/deployment-apps/outputs_to_indexers/local"
+        state: directory
+        owner: "{{ splunk_nix_user }}"
+        group: "{{ splunk_nix_group }}"
+        mode: "0755"
+
+    - name: Configure forwarders to send data to indexer cluster peers
+      ansible.builtin.copy:
+        dest: "/opt/splunk/etc/deployment-apps/outputs_to_indexers/local/outputs.conf"
+        owner: "{{ splunk_nix_user }}"
+        group: "{{ splunk_nix_group }}"
+        mode: "0644"
+        content: |
+          [tcpout]
+          defaultGroup = idxc_indexers
+
+          [tcpout:idxc_indexers]
+          server = {% for host in groups['indexer'] %}{{ host }}:{{ splunktcpin_port.number }}{% if not loop.last %},{% endif %}{% endfor %}
+          autoLB = true
+          useACK = true
+      notify: reload deployment server
+
+- name: Deploy Splunk Universal Forwarders
+  hosts: uf
+  become: yes
+  vars:
+    splunk_use_systemd: true
+    splunk_use_initd: false
+    current_start_method: "systemd"
+    boot_start_misconfigured: false
+    splunk_uri_ds: "{{ hostvars[groups['deploymentserver'][0]].ansible_host | default(groups['deploymentserver'][0]) }}:{{ splunkd_port | default(8089) }}"
+  pre_tasks:
+    - name: Remove stale Splunk Forwarder systemd file if it exists
+      ansible.builtin.file:
+        path: /etc/systemd/system/SplunkForwarder.service
+        state: absent
+      ignore_errors: yes
+  environment:
+    SPLUNK_HOME: "/opt/splunkforwarder"
+    ANS_BYPASS_PROMPT: "true"
+  vars_files:
+    - my_splunk_uf_config.yml
+    - my_splunk_secrets.yml
+  roles:
+    - role: "./ansible-role-for-splunk/roles/splunk"
+
+- name: Configure Monitoring Console
+  hosts: dmc
+  become: yes
+  environment:
+    SPLUNK_HOME: "/opt/splunk"
+    ANS_BYPASS_PROMPT: "true"
+  vars_files:
+    - my_splunk_distributed_config.yml
+    - my_splunk_secrets.yml
+  vars:
+    splunk_use_systemd: true
+    splunk_use_initd: false
+    current_start_method: "systemd"
+    boot_start_misconfigured: false
+    deployment_task: "configure_dmc.yml"
+  pre_tasks:
+    - name: Remove stale systemd file
+      ansible.builtin.file:
+        path: /etc/systemd/system/Splunkd.service
+        state: absent
+      ignore_errors: yes
+  roles:
+    - role: "./ansible-role-for-splunk/roles/splunk"
+
+  post_tasks:
+    - name: Wait for remote Splunk API ports to be fully online
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[item]['ansible_host'] | default(item) }}"
+        port: 8089
+        timeout: 60
+      loop: "{{ groups['indexer'] + groups['search'] }}"
+
+    - name: Automatically link Indexers and Search Heads as MC Search Peers
+      ansible.builtin.command: >
+        /opt/splunk/bin/splunk add search-server 
+        https://{{ hostvars[item]['ansible_host'] | default(item) }}:8089 
+        -auth admin:{{ splunk_admin_password }}
+        -remoteUsername admin
+        -remotePassword {{ splunk_admin_password }}
+      loop: "{{ groups['indexer'] + groups['search'] }}"
+      register: peer_result
+      failed_when:
+        - peer_result.rc != 0
+        - "'already exists' not in peer_result.stderr"
+      no_log: false
+
+    - name: Enable automatic Monitoring Console configuration
+      community.general.ini_file:
+        path: /opt/splunk/etc/apps/splunk_monitoring_console/local/splunk_monitoring_console_assets.conf
+        section: settings
+        option: mc_auto_config
+        value: enabled
+        mode: "0644"

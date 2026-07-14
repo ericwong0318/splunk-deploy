@@ -1,0 +1,53 @@
+---
+# YAML format inventory with nested groups for variable inheritance
+# Distributed Splunk Enterprise inventory.
+# Use real IPs or DNS names as inventory hostnames. The monitoring-console task
+# adds peers by inventory_hostname, so aliases require working DNS.
+#
+# References:
+# https://docs.ansible.com/ansible/latest/user_guide/intro_inventory.html
+# https://docs.ansible.com/ansible/2.9/plugins/inventory/yaml.html
+# https://www.digitalocean.com/community/tutorials/how-to-manage-multistage-environments-with-ansible
+# ##########################################################################
+all:
+  children:
+    full:
+      children:
+        dmc:
+          hosts:
+            splunk-master-node: # Use an alias
+              ansible_host: 192.168.200.183
+              ansible_user: ericw
+
+        deploymentserver:
+          hosts:
+            splunk-master-node: # Matches the alias
+              ansible_host: 192.168.200.183
+              ansible_user: ericw
+
+        clustermanager:
+          hosts:
+            splunk-master-node: # Matches the alias
+              ansible_host: 192.168.200.183
+              ansible_user: ericw
+
+        indexer:
+          hosts:
+            192.168.200.176:
+              ansible_user: ericw
+            192.168.200.180:
+              ansible_user: ericw
+            192.168.200.181:
+              ansible_user: ericw
+
+        search:
+          hosts:
+            192.168.200.182:
+              ansible_user: ericw
+
+    uf:
+      hosts:
+        192.168.200.178:
+          ansible_user: ericw
+        192.168.200.184:
+          ansible_user: ericw

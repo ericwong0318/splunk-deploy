@@ -1,0 +1,119 @@
+---
+# Distributed Splunk Enterprise (ansible-role-for-splunk).
+# Includes: indexer cluster peers, search head, deployment server,
+# monitoring console, and cluster manager.
+#
+# SECRET BEST PRACTICE:
+# Keep splunk_admin_password, splunk_idxc_key, splunk_ds_key, and SSH/become
+# passwords in encrypted my_splunk_secrets.yml via Ansible Vault.
+
+deployment_task: "check_splunk.yml"
+splunk_install_type: "full"
+splunk_install_path: "/opt"
+
+# ==============================================================================
+# PACKAGE SOURCE
+# ==============================================================================
+splunk_package_version: "10.4.0"
+build_id: "f798d4d49089"
+splunk_package_arch: "linux-amd64.tgz"
+
+# Target nodes download directly instead of pushing the package over SSH.
+splunk_download_local: false
+
+splunk_package_url_full: "https://download.splunk.com/products/splunk/releases/{{ splunk_package_version }}/linux/splunk-{{ splunk_package_version }}-{{ build_id }}-{{ splunk_package_arch }}"
+splunk_validate_certs: true
+
+# ==============================================================================
+# OS, SERVICE, AND AUTHENTICATION
+# ==============================================================================
+splunk_nix_user: "splunk"
+splunk_nix_group: "splunk"
+splunk_use_initd: false
+splunk_create_polkit: 0
+systemd_unit_full: "Splunkd"
+
+splunk_user_seed: true
+splunk_admin_username: "admin"
+splunk_auth: "{{ splunk_admin_username }}:{{ splunk_admin_password }}"
+
+# Most Splunk API calls in this lab use self-signed Splunk certificates.
+splunk_svc_verify: false
+retry_num: 20
+retry_delay: 5
+
+# ==============================================================================
+# CLUSTER ENDPOINTS
+# ==============================================================================
+# These are derived from inventory group membership so the hosts connect together:
+# - indexers and search heads point at the cluster manager
+# - full Splunk nodes can phone home to the deployment server
+# - the monitoring console joins the indexer cluster and adds peers
+splunkd_port: 8089
+splunkweb_port: { desc: "Splunk Web", protocol: "tcp", number: 8000 }
+splunkapi_port: { desc: "Splunk API", protocol: "tcp", number: "{{ splunkd_port }}" }
+splunktcpin_port: { desc: "Splunk TCP input", protocol: "tcp", number: 9997 }
+splunkhec_port: { desc: "Splunk HEC", protocol: "tcp", number: 8088 }
+splunkidxcrep_port: { desc: "Indexer cluster replication", protocol: "tcp", number: "{{ splunk_idxc_rep_port }}" }
+
+splunk_mgmt_uri: "{{ ansible_host | default(inventory_hostname) }}"
+splunk_uri_cm: "https://{{ hostvars[groups['clustermanager'][0]].ansible_host | default(groups['clustermanager'][0]) }}:{{ splunkd_port }}"
+splunk_uri_ds: "{{ hostvars[groups['deploymentserver'][0]].ansible_host | default(groups['deploymentserver'][0]) }}:{{ splunkd_port }}"
+
+# ==============================================================================
+# INDEXER CLUSTER SETTINGS
+# ==============================================================================
+splunk_idxc_label: "ericw_idxc"
+splunk_idxc_rep_port: 9887
+splunk_idxc_rf: 2
+splunk_idxc_sf: 2
+splunk_idxc_key: "{{ vault_splunk_idxc_key | default('CHANGE_ME_IDXC_PASS4SYMMKEY') }}"
+
+# ==============================================================================
+# DEPLOYMENT SERVER SETTINGS
+# ==============================================================================
+# The deployment server manages UFs and, if desired, shared deployment apps.
+# Forwarders should use the same splunk_uri_ds value in my_splunk_uf_config.yml.
+clientName: "{{ inventory_hostname }}"
+phoneHomeIntervalInSecs: 60
+splunk_ds_key: "{{ vault_splunk_ds_key | default('CHANGE_ME_DS_PASS4SYMMKEY') }}"
+
+serverclasses:
+  - serverclass: ALL_UNIVERSAL_FORWARDERS
+    restartSplunkd: 1
+    whitelist:
+      - "*"
+    apps:
+      - name: outputs_to_indexers
+        options:
+          restartSplunkd: 1
+
+# ==============================================================================
+# ROLE-SPECIFIC FIREWALL PORTS
+# ==============================================================================
+configure_firewall: false
+splunk_firewall_ports:
+  - "{{ splunkweb_port }}"
+  - "{{ splunkapi_port }}"
+  - "{{ splunktcpin_port }}"
+  - "{{ splunkhec_port }}"
+  - "{{ splunkidxcrep_port }}"
+
+# ==============================================================================
+# DEEP ROLE TARGET CONFIGURATION
+# ==============================================================================
+splunk:
+  opt: "/opt"
+  home: "/opt/splunk"
+  user: "splunk"
+  group: "splunk"
+  role: "splunk_distributed"
+  admin_user: "admin"
+  password: "{{ splunk_admin_password }}"
+  declarative_admin_password: true
+  accept_license: true
+  web:
+    settings:
+      enableSplunkWebCSRF: "false"
+      remote_frontend_header: "X-Forwarded-For"
+      pattern_policy: "mix"
