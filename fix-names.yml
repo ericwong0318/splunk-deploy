@@ -10,7 +10,7 @@
     - name: Update Splunk internal serverName
       ansible.builtin.command: >
         /opt/splunk/bin/splunk set servername {{ inventory_hostname | replace('.', '-') }} 
-        -auth admin:P@ssw0rd
+        -auth admin:{{ splunk_admin_password }}
       ignore_errors: yes
 
     - name: Restart Splunk to apply the new identity
