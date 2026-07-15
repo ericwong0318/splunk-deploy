@@ -41,8 +41,6 @@ ansible-playbook -i inventory-distributed.yml deploy-distributed.yml
 
 ---
 
-
-
 ## Verification & Execution Results
 
 A successful standalone end-to-end deployment will execute without failures or unreachable endpoints:
@@ -69,20 +67,22 @@ splunk-master-node         : ok=119  changed=2    unreachable=0    failed=0    s
 
 ---
 
-
-
 ## Post-Installation Health Check
-
-
 
 ### Splunk Monitoring Console
 
 Verify primary indexing status, operational volume metrics, and overall infrastructure health metrics directly within the Splunk Web environment:
 
-health_check
+![health_check](img/health_check.png)
 
 ### Agent Management/ Forwarder Management Console
 
 Confirm that Universal Forwarder (e.g., `ericw-uf3`) have successfully phoned home to the central Splunk Enterprise instance:
 
-agent_management
+![agent_management](img/agent_management.png)
+
+### Indexing Performance
+
+Ensure the indexing performance is good.
+
+![indexing_performance](img/indexing_performance.png)
